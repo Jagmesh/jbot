@@ -1,0 +1,1 @@
+export const TTS_SYNTHESIZE_EVENT_KEY = 'synthesize_text'

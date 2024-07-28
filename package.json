@@ -1,0 +1,24 @@
+{
+  "name": "bot-ts",
+  "type": "commonjs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "audic": "^3.0.2",
+    "dotenv": "^16.4.5",
+    "node-gtts": "^2.0.2",
+    "tmi.js": "^1.8.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/tmi.js": "^1.8.6"
+  }
+}
