@@ -10,7 +10,6 @@ export class TwitchService implements Partial<Events> {
     private readonly _log: LogService;
     private readonly _config: ConfigService;
 
-
     constructor() {
         this._config = new ConfigService();
         this._tts = new TtsService()

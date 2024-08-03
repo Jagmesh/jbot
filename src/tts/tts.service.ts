@@ -3,6 +3,9 @@ import {EventQueueService} from "../event-queue/event-queue.service";
 import {LogService} from "../log/log.service";
 import {TTS_SYNTHESIZE_EVENT_KEY} from "./tts.const";
 import {exec} from "child_process";
+import gtts from "node-gtts"
+import * as fs from "fs";
+import EventTarget from "event-target-shim";
 
 export class TtsService {
     private readonly _scriptPath: string;
@@ -26,7 +29,7 @@ export class TtsService {
         this._eventQueue.enqueue(TTS_SYNTHESIZE_EVENT_KEY, text);
     }
 
-    async synthesizeSpeech(text: string) {
+    async synthesizeSpeechMicrosoft(text: string): Promise<void | null> {
         const command = `powershell -ExecutionPolicy Bypass -File "${this._scriptPath}" -text "${text}"`;
 
         return new Promise((resolve, reject) => {
@@ -39,5 +42,25 @@ export class TtsService {
                 resolve(stdout ? this._log.write(`Stdout: ${stdout}`) : null)
             })
         });
+    }
+
+    async synthesizeSpeech(text: string): Promise<void | null> {
+        const filepath = `gtts_${Math.round(Math.random() * 1_000_000)}.wav`
+
+        return new Promise((resolve) => {
+            gtts('ru').save(filepath, text, async () => {
+               this._log.write('File saved. Playing...')
+                const audic = new (await import("audic").then(audic => audic.default))(filepath)
+                await audic.play()
+
+                // @ts-ignore there is such a method
+                audic.addEventListener('ended', (event) => {
+                    this._log.write(`File playing ended`)
+                    fs.unlink(filepath, (err) => err ? this._log.error(err) : null)
+                    resolve(null)
+                })
+            })
+        })
+
     }
 }
