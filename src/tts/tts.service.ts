@@ -14,8 +14,8 @@ export class TtsService {
 
     constructor() {
         this._scriptPath = path.join(__dirname, '..', '..', 'static', 'speak.ps1');
-        this._log = new LogService('TTS_SERVICE')
 
+        this._log = new LogService('TTS_SERVICE')
         this._eventQueue = new EventQueueService();
         this._eventQueue.on(TTS_SYNTHESIZE_EVENT_KEY, async (text: string) => {
             this._log.write(`Processing event "${TTS_SYNTHESIZE_EVENT_KEY}" with text: "${text}"...`)
