@@ -6,19 +6,24 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && node dist/index.js"
+    "start": "npm run build && node dist/index.js",
+    "start:watch": "npm run build && nodemon --ext js dist/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "audic": "^3.0.2",
+    "colors": "^1.4.0",
     "dotenv": "^16.4.5",
+    "jblog": "^0.0.5",
     "node-gtts": "^2.0.2",
-    "tmi.js": "^1.8.5"
+    "tmi.js": "^1.8.5",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
-    "@types/tmi.js": "^1.8.6"
+    "@types/tmi.js": "^1.8.6",
+    "nodemon": "^3.1.4"
   }
 }
