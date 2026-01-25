@@ -5,27 +5,33 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "npm run build && node dist/index.js",
-    "start:watch": "npm run build && nodemon --ext js dist/index.js"
+    "server:build": "tsc",
+    "server:dev": "npm run build && nodemon --ext js dist/index.js",
+
+    "ui:dev": "cd ui && npm run dev",
+    "ui:build": "cd ui && npm run build",
+
+    "all:build": "npm run server:build && npm run ui:build",
+    "all:start": "npm run all:build && npm run start",
+
+    "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "audic": "^3.0.2",
     "colors": "^1.4.0",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
     "jblog": "^0.0.5",
     "node-gtts": "^2.0.2",
-    "tmi.js": "^1.8.5",
-    "typescript": "^5.9.3"
+    "tmi.js": "^1.8.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^20.14.10",
     "@types/tmi.js": "^1.8.6",
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "typescript": "^5.9.3"
   }
 }

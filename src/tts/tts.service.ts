@@ -3,19 +3,22 @@ import {EventQueueService} from "../event-queue/event-queue.service";
 import {TTS_SYNTHESIZE_EVENT_KEY} from "./tts.const";
 import {exec} from "child_process";
 import gtts from "node-gtts"
-import * as fs from "fs";
 import Logger from "jblog";
-
+import {WebServer} from "../web/web.server";
 
 export class TtsService {
-    private readonly _scriptPath: string;
+    private readonly _staticDir: string;
+    private readonly _scriptFilePath: string;
     private _eventQueue: EventQueueService = new EventQueueService();
     private readonly _log = new Logger({scopes: ['TTS_SERVICE']});
     private readonly _entryAudioFilePath: string;
+    private readonly _generatedAudiosDirPath: string;
 
     constructor() {
-        this._scriptPath = path.join(__dirname, '..', '..', 'static', 'speak.ps1');
-        this._entryAudioFilePath = path.join(__dirname, '..', '..', 'static', 'hello.mp3')
+        this._staticDir = path.join(__dirname, '..', '..', 'static');
+        this._scriptFilePath = path.join(this._staticDir, 'speak.ps1');
+        this._entryAudioFilePath = path.join(this._staticDir, 'hello.mp3');
+        this._generatedAudiosDirPath = path.join(this._staticDir, 'generated');
 
         this._eventQueue.on(TTS_SYNTHESIZE_EVENT_KEY, async (text: string) => {
             this._log.info(`Processing event "${TTS_SYNTHESIZE_EVENT_KEY}" with text: "${text}"...`)
@@ -30,7 +33,7 @@ export class TtsService {
     }
 
     async synthesizeSpeechMicrosoft(text: string): Promise<void | null> {
-        const command = `powershell -ExecutionPolicy Bypass -File "${this._scriptPath}" -text "${text}"`;
+        const command = `powershell -ExecutionPolicy Bypass -File "${this._scriptFilePath}" -text "${text}"`;
 
         return new Promise((resolve, reject) => {
             exec(command, (error, stdout, stderr) => {
@@ -45,31 +48,23 @@ export class TtsService {
     }
 
     async synthesizeSpeech(text: string): Promise<void | null> {
-        const filepath = `gtts_${Math.round(Math.random() * 1_000_000)}.wav`
+        const filepath = path.join(this._generatedAudiosDirPath, `gtts_${Math.round(Math.random() * 1_000_000)}.wav`)
 
         return new Promise((resolve) => {
             gtts('ru').save(filepath, text, async () => {
-                this._log.info('File saved')
-                await this._playAudio(this._entryAudioFilePath)
-                await this._playAudio(filepath);
-                fs.unlink(filepath, (err) => err ? this._log.error(err) : null)
+                this._log.info(`File saved into {${filepath}}`)
+                this._playAudio(this._entryAudioFilePath)
+                this._playAudio(filepath)
+                // TODO: add unlinking audiofiles after web finished playback
+                this._log.success(`File {${filepath}} finished`)
                 resolve(null)
             })
         })
     }
 
-    private async _playAudio(filePath: string): Promise<null> {
+    private _playAudio(filePath: string): void {
         this._log.info(`Playing [${filePath}]`)
-        const audic = new (await import("audic").then(audic => audic.default))(filePath)
-        await audic.play()
-
-        return new Promise(resolve => {
-            // @ts-ignore there is such a method
-            audic.addEventListener('ended', (event) => {
-                this._log.success(`File [${filePath}] playing ended`)
-                resolve(null)
-            })
-        })
-
+        const rel = path.relative(this._staticDir, filePath);
+        WebServer.broadcastPlay('/'+rel)
     }
 }

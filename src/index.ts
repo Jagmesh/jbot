@@ -1,8 +1,8 @@
 import {TwitchRouter} from "./twitch/twitch.router";
-import {startWebServer} from "./web/web.server";
+import {WebServer} from "./web/web.server";
 
 async function bootstrap() {
-    startWebServer(3210);
+    new WebServer().start()
 
     await new TwitchRouter().init()
 }
