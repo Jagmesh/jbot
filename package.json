@@ -7,19 +7,17 @@
   "scripts": {
     "server:build": "tsc",
     "server:dev": "npm run build && nodemon --ext js dist/index.js",
-
     "ui:dev": "cd ui && npm run dev",
     "ui:build": "cd ui && npm run build",
-
     "all:build": "npm run server:build && npm run ui:build",
     "all:start": "npm run all:build && npm run start",
-
     "start": "node dist/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "1.13.3",
     "colors": "^1.4.0",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",

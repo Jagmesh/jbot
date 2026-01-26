@@ -1,3 +1,5 @@
 export function calculateAudioSpeed(duration: number): number {
-    return 1 + (duration / 100) * 3;
+    // TODO: enable it back
+    // return 1 + (duration / 100) * 3;
+    return 1 + duration * 0;
 }

@@ -7,7 +7,7 @@ import Logger from 'jblog'
 export class TwitchRouter {
     private readonly _client: tmi.Client;
     private readonly _log = new Logger({scopes: ['TWITCH', 'ROUTER']});
-    private readonly _twitchService: TwitchService = new TwitchService();
+    private readonly _twitchService: TwitchService;
     private readonly _config: ConfigService = new ConfigService();
 
     private readonly _subscribedEvents: ClassMethodNamesType<TwitchService>[] = [
@@ -16,10 +16,12 @@ export class TwitchRouter {
 
     constructor() {
         this._client = new tmi.Client({
-            options: {debug: true},
+            options: { debug: true },
             channels: [this._config.config.TWITCH_CHANNEL_NAME],
-            connection: {
-                reconnect: true
+            connection: { reconnect: true },
+            identity: {
+                username: this._config.config.TWITCH_BOT_USERNAME,
+                password: this._config.config.TWITCH_BOT_ACCESS_TOKEN
             },
             logger: {
                 info: (data) => {
@@ -33,6 +35,7 @@ export class TwitchRouter {
                 }
             }
         });
+        this._twitchService = new TwitchService(this._client);
     }
 
     async init() {

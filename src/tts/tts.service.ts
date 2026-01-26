@@ -1,10 +1,13 @@
 import * as path from "path";
 import {EventQueueService} from "../event-queue/event-queue.service";
-import {TTS_SYNTHESIZE_EVENT_KEY} from "./tts.const";
+import {SYNTHESIS_PROVIDER, TTS_SYNTHESIZE_EVENT_KEY} from "./tts.const";
 import {exec} from "child_process";
 import gtts from "node-gtts"
 import Logger from "jblog";
 import {WebServer} from "../web/web.server";
+import * as fs from "node:fs";
+import {QwenService} from "./qwen/qwen.service";
+import {getCurrentUnderscoreDateTime} from "./tts.util";
 
 export class TtsService {
     private readonly _staticDir: string;
@@ -20,16 +23,28 @@ export class TtsService {
         this._entryAudioFilePath = path.join(this._staticDir, 'hello.mp3');
         this._generatedAudiosDirPath = path.join(this._staticDir, 'generated');
 
-        this._eventQueue.on(TTS_SYNTHESIZE_EVENT_KEY, async (text: string) => {
-            this._log.info(`Processing event "${TTS_SYNTHESIZE_EVENT_KEY}" with text: "${text}"...`)
-            await this.synthesizeSpeech(text)
+        this._eventQueue.on(TTS_SYNTHESIZE_EVENT_KEY, async ({text, provider}:{text: string, provider: SYNTHESIS_PROVIDER}) => {
+            this._log.info(`Processing event "${TTS_SYNTHESIZE_EVENT_KEY}" with provider "${provider}" and with text: "${text}"...`)
+            switch (provider) {
+                case SYNTHESIS_PROVIDER.GOOGLE:
+                    await this.synthesizeSpeechGoogle(text)
+                    break;
+                case SYNTHESIS_PROVIDER.MICROSOFT:
+                    await this.synthesizeSpeechMicrosoft(text)
+                    break;
+                case SYNTHESIS_PROVIDER.QWEN:
+                    await this.synthesizeSpeechQwen(text)
+                    break;
+                default:
+                    await this.synthesizeSpeechGoogle(text)
+            }
             this._log.success(`Event "${TTS_SYNTHESIZE_EVENT_KEY}" finished with text: "${text}"`)
             this._eventQueue.emit('end')
         });
     }
 
-    addToAudioQueue(text: string) {
-        this._eventQueue.enqueue(TTS_SYNTHESIZE_EVENT_KEY, text);
+    addToAudioQueue(text: string, provider: SYNTHESIS_PROVIDER) {
+        this._eventQueue.enqueue(TTS_SYNTHESIZE_EVENT_KEY, { text, provider });
     }
 
     async synthesizeSpeechMicrosoft(text: string): Promise<void | null> {
@@ -47,7 +62,7 @@ export class TtsService {
         });
     }
 
-    async synthesizeSpeech(text: string): Promise<void | null> {
+    async synthesizeSpeechGoogle(text: string): Promise<void | null> {
         const filepath = path.join(this._generatedAudiosDirPath, `gtts_${Math.round(Math.random() * 1_000_000)}.wav`)
 
         return new Promise((resolve) => {
@@ -60,6 +75,19 @@ export class TtsService {
                 resolve(null)
             })
         })
+    }
+
+    async synthesizeSpeechQwen(text: string): Promise<void | null> {
+        const filepath = path.join(this._generatedAudiosDirPath, `tts_${getCurrentUnderscoreDateTime()}_${Math.round(Math.random() * 1_000)}.wav`)
+
+        const buffer = await QwenService.synthesizeSpeech(text).catch((error) => this._log.error(error));
+        if (!buffer) return;
+
+        await fs.promises.writeFile(filepath, buffer);
+        this._log.info(`File saved into {${filepath}}`)
+
+        this._playAudio(this._entryAudioFilePath)
+        this._playAudio(filepath)
     }
 
     private _playAudio(filePath: string): void {
