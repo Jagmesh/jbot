@@ -1,6 +1,7 @@
 **/*.env
 **/docker-compose.yaml
 static/generated
+static/__pycache__
 
 # Logs
 logs
