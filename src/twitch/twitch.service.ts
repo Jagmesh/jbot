@@ -4,7 +4,6 @@ import {TtsService} from "../tts/tts.service";
 import {ConfigService} from "../config/config.service";
 import Logger from "jblog";
 import {SYNTHESIS_PROVIDER} from "../tts/tts.const";
-import {QwenService} from "../tts/qwen/qwen.service";
 
 export class TwitchService implements Partial<Events> {
     private readonly _tts: TtsService = new TtsService();

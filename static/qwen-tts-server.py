@@ -24,14 +24,15 @@ def parse_args():
 
 
 MODEL_ID = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
-DEVICE = "cpu"
+DEVICE = "cuda:0"
 DTYPE = torch.bfloat16
 
 log("Loading model, this may take a while...")
 model = Qwen3TTSModel.from_pretrained(
     MODEL_ID,
     device_map=DEVICE,
-    dtype=DTYPE
+    dtype=DTYPE,
+    attn_implementation="sdpa",  # ← оптимальный вариант
 )
 log("Model loaded.")
 
@@ -42,6 +43,7 @@ class TTSRequest(BaseModel):
     text: str
     speaker: str = "Ryan"
     language: str = "Auto"
+    instruct: str = ""
 
 
 async def _run_with_elapsed_logger(func, *args, **kwargs):
@@ -89,7 +91,8 @@ async def synthesize(req: TTSRequest):
             model.generate_custom_voice,
             text=req.text,
             language=req.language,
-            speaker=req.speaker
+            speaker=req.speaker,
+            instruct=req.instruct
         )
 
         log(f"TTS took {elapsed:.2f}s")
