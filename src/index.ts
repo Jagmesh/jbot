@@ -8,7 +8,7 @@ async function bootstrap() {
         process.on(signal, shutdown);
     });
 
-    await QwenService.init()
+    // await QwenService.init()
     new WebServer().start()
 
     await new TwitchRouter().init()

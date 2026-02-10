@@ -6,6 +6,7 @@ import Logger from "jblog";
 const log = new Logger({scopes: ['WEB_SERVER']});
 
 const sseClients = new Set<Response>();
+const sseChatClients = new Set<Response>();
 
 export class WebServer {
     private readonly _log = log
@@ -16,6 +17,20 @@ export class WebServer {
 
         for (const res of sseClients) {
             res.write(`event: play\n`);
+            res.write(`data: ${payload}\n\n`);
+        }
+    }
+
+    static broadcastChatMessage(data: {
+                                    user: string
+                                    color: string
+                                    text: string
+                                }) {
+        log.info(`Broadcasting chat message event for {${data.user}: ${data.text}}`)
+        const payload = JSON.stringify(data);
+
+        for (const res of sseChatClients) {
+            res.write(`event: chat_message\n`);
             res.write(`data: ${payload}\n\n`);
         }
     }
@@ -34,6 +49,10 @@ export class WebServer {
             res.sendFile(path.join(uiDir, 'index.html'));
         });
 
+        app.get('/chat', (_req, res) => {
+            res.sendFile(path.join(uiDir, 'chat.html'));
+        });
+
         app.get("/events", (req, res) => {
             res.status(200);
             res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -48,6 +67,23 @@ export class WebServer {
 
             req.on("close", () => {
                 sseClients.delete(res);
+            });
+        });
+
+        app.get("/sse/chat", (req, res) => {
+            res.status(200);
+            res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("Connection", "keep-alive");
+
+            res.flushHeaders?.();
+
+            res.write("\n");
+
+            sseChatClients.add(res);
+
+            req.on("close", () => {
+                sseChatClients.delete(res);
             });
         });
 

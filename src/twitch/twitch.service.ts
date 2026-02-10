@@ -4,6 +4,7 @@ import {TtsService} from "../tts/tts.service";
 import {ConfigService} from "../config/config.service";
 import Logger from "jblog";
 import {SYNTHESIS_PROVIDER} from "../tts/tts.const";
+import {WebServer} from "../web/web.server";
 
 export class TwitchService implements Partial<Events> {
     private readonly _tts: TtsService = new TtsService();
@@ -11,6 +12,22 @@ export class TwitchService implements Partial<Events> {
     private readonly _config: ConfigService = new ConfigService();
 
     constructor(readonly _client: tmi.Client) {}
+
+    message(channel: string, tags: tmi.ChatUserstate, message: string, self: boolean, ...rest: any[]) {
+        console.log('channel', channel)
+        console.log('tags', tags)
+        console.log('message', message)
+        console.log('self', self)
+        console.log('rest', rest)
+
+        if (self) return;
+        this._log.info(`Message from ${tags.username}: ${message}`)
+        WebServer.broadcastChatMessage({
+            text: message,
+            user: tags["display-name"] || 'unknown',
+            color: tags.color || '#ffffff',
+        })
+    }
 
     redeem(channel: string, username: string, rewardID: string, ...rest: any[]) {
         // there is actually a msg as a last arg here

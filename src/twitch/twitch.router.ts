@@ -11,6 +11,7 @@ export class TwitchRouter {
     private readonly _config: ConfigService = new ConfigService();
 
     private readonly _subscribedEvents: ClassMethodNamesType<TwitchService>[] = [
+        'message',
         'redeem',
     ]
 
@@ -43,6 +44,7 @@ export class TwitchRouter {
 
         for (const eventName of this._subscribedEvents) {
             this._client.on(eventName, (...args) => {
+                // @ts-ignore
                 this._twitchService[eventName](...args)
             })
             this._log.info(`${this._log.highlight(eventName)} event registered`)
