@@ -14,11 +14,11 @@ export class TwitchService implements Partial<Events> {
     constructor(readonly _client: tmi.Client) {}
 
     message(channel: string, tags: tmi.ChatUserstate, message: string, self: boolean, ...rest: any[]) {
-        console.log('channel', channel)
-        console.log('tags', tags)
-        console.log('message', message)
-        console.log('self', self)
-        console.log('rest', rest)
+        // console.log('channel', channel)
+        // console.log('tags', tags)
+        // console.log('message', message)
+        // console.log('self', self)
+        // console.log('rest', rest)
 
         if (self) return;
         this._log.info(`Message from ${tags.username}: ${message}`)

@@ -9,6 +9,9 @@ type LogEntry = { text: string; type: "error" | "info" };
 
 let es: EventSource | null = null;
 
+const SSE_EVENTS_PATH = '/sse/audio'
+const PLAY_AUDIO_EVENT = 'play_audio'
+
 const enabled = ref(false);
 const playing = ref(false);
 const queue = ref<string[]>([]);
@@ -67,12 +70,12 @@ async function pump() {
 }
 
 onMounted(() => {
-  es = new EventSource("/events");
+  es = new EventSource(SSE_EVENTS_PATH);
 
-  es.addEventListener("open", () => log("Connected to /events"));
+  es.addEventListener("open", () => log(`Connected to ${SSE_EVENTS_PATH}`));
   es.addEventListener("error", () => log("SSE error (reconnecting...)", 'error'));
 
-  es.addEventListener("play", (ev) => {
+  es.addEventListener(PLAY_AUDIO_EVENT, (ev) => {
     const data = JSON.parse((ev as MessageEvent).data) as PlayEventPayload;
     queue.value.push(data.url);
     log(`Enqueued: ${data.url}`);

@@ -1,24 +1,23 @@
 <template>
   <div class="ticker" ref="tickerRef">
     <div
-        v-if="current"
+        v-for="msg in actives"
+        :key="msg.id"
         class="message"
-        ref="messageRef"
+        :data-id="msg.id"
+        ref="messageRefs"
+        :style="{ transform: `translateX(${msg.x}px)` }"
     >
       <div class="message-bg"></div>
-      <span
-          class="user"
-          :style="{ color: current.color || '#ffffff' }"
-      >
-        {{ current.user }}:
-      </span>
-      <span class="text">{{ current.text }}</span>
+      <span class="user" :style="{ color: msg.color || '#ffffff' }">{{ msg.user }}:</span>
+      <span class="text">{{ msg.text }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import {getRefWidth} from "./utils/utils.ts";
 
 type ChatMessage = {
   id: string
@@ -27,62 +26,157 @@ type ChatMessage = {
   text: string
 }
 
-const queue = ref<ChatMessage[]>([])
-const current = ref<ChatMessage | null>(null)
-
-const tickerRef = ref<HTMLElement | null>(null)
-const messageRef = ref<HTMLElement | null>(null)
-
-const SPEED = 200 // px/sec
-
-function playNext() {
-  if (current.value || queue.value.length === 0) return
-  current.value = queue.value.shift()!
-  nextTick(() => animateMessage())
+type ActiveMsg = ChatMessage & {
+  x: number
+  width: number
+  measured: boolean
 }
 
-function animateMessage() {
-  if (!tickerRef.value || !messageRef.value || !current.value) return
+const queue = ref<ChatMessage[]>([])
+const actives = ref<ActiveMsg[]>([])
 
-  const tickerWidth = tickerRef.value.offsetWidth
-  const messageWidth = messageRef.value.offsetWidth
+const tickerRef = ref<HTMLElement | null>(null)
+const messageRefs = ref<HTMLElement[]>([])
 
-  let start = performance.now()
-  const startX = tickerWidth
-  const endX = -messageWidth
-  const distance = startX - endX
-  const duration = distance / SPEED * 1000 // мс
+// Параметры — подбирай по вкусу
+const SPEED = 100       // px / sec
+const GAP = 12          // px — минимальный зазор между сообщениями
+const REMOVE_BUFFER = 6 // px — удаляем, когда правый край ушёл глубже этого буфера
 
-  function step(now: number) {
-    const elapsed = now - start
-    const progress = Math.min(elapsed / duration, 1)
-    const x = startX + (endX - startX) * progress
-    if (messageRef.value) messageRef.value.style.transform = `translateX(${x}px)`
+let measuring = false   // флаг: сейчас идёт измерение нового элемента
 
-    if (progress < 1) {
-      requestAnimationFrame(step)
-    } else {
-      current.value = null
-      playNext()
+function findElById(id: string) {
+  return messageRefs.value.find(el => el.dataset.id === id) || null
+}
+
+// измеряем ширину элемента и помечаем measured=true
+async function measureActive(active: ActiveMsg) {
+  // если шрифт может грузиться асинхронно, подождём (это предотвращает width=0)
+  if ((document as any).fonts && (document as any).fonts.ready) {
+    try {
+      await (document as any).fonts.ready
+    } catch {
+      // ignore
     }
   }
 
-  requestAnimationFrame(step)
+  const el = findElById(active.id)
+  if (!el) {
+    active.width = 0
+    active.measured = true
+    return
+  }
+
+  // Force reflow read
+  active.width = el.offsetWidth
+  // Устанавливаем стиль (на случай, если визуально ещё не в нужной позиции)
+  el.style.transform = `translateX(${active.x}px)`
+  active.measured = true
 }
 
+// Попытка спавна одного следующего сообщения — защищена measuring флагом
+async function trySpawnOnce() {
+  if (measuring) return false
+  if (queue.value.length === 0) return false
+
+  const tickerW = getRefWidth(tickerRef)
+  const last = actives.value[actives.value.length - 1]
+
+  // Если есть последний, но он ещё не измерен — нельзя спавнить
+  if (last && !last.measured) return false
+
+  // Условие для спавна: либо нет активных, либо правый край last ушёл влево на GAP
+  if (!last || (last.x + last.width <= tickerW - GAP)) {
+    const msg = queue.value.shift()!
+    const active: ActiveMsg = { ...msg, x: tickerW, width: 0, measured: false }
+    actives.value.push(active)
+
+    measuring = true
+    await nextTick()
+    await measureActive(active)
+    measuring = false
+    return true
+  }
+
+  return false
+}
+
+// РАФ цикл — двигает все active
+let rafId: number | null = null
+let lastTs = 0
+
+function rafLoop(ts: number) {
+  if (!lastTs) lastTs = ts
+  const delta = (ts - lastTs) / 1000
+  lastTs = ts
+
+  const movePx = SPEED * delta
+
+  // Двигаем все
+  for (let i = 0; i < actives.value.length; i++) {
+    actives.value[i]!.x -= movePx
+  }
+
+  // Удаляем те, которые полностью вышли (с небольшим буфером)
+  while (actives.value.length > 0) {
+    const first = actives.value[0]
+    if (first!.x + first!.width < -REMOVE_BUFFER) {
+      // убираем реф и сдвигаем массив
+      actives.value.shift()
+    } else {
+      break
+    }
+  }
+
+  // Пытаемся спавнить новые (может спавнить несколько, но measurement блокирует конкуренцию)
+  // Важно: не await здесь — measurement выполняется асинхронно, но флаг measuring защитит от гонок.
+  let guard = 0
+  while (guard < 6) { // лимит, чтобы не заблокировать цикл
+    trySpawnOnce()
+    // trySpawnOnce может вернуть Promise<boolean> — но мы не ждём; проверка measuring предотвратит многократный spawn
+    // Если trySpawnOnce синхронно вернёт false — значит нет места; тогда прервём попытки.
+    // Но trySpawnOnce возвращает Promise, поэтому проверяем measuring/queue length next iteration.
+    // Простейшее правило: прерываем, если measuring или нет очереди или last не даёт места.
+    if (measuring) break
+    if (queue.value.length === 0) break
+    // пробуем ещё раз (возможно после предыдущ измерения освободилось место)
+    guard++
+    // small break to let measurement finish across ticks — избегаем busy loop
+    if (guard > 1) break
+  }
+
+  rafId = requestAnimationFrame(rafLoop)
+}
+
+// SSE: слушаем события и пушим в очередь
 onMounted(() => {
-  const es = new EventSource("/sse/chat")
+  rafId = requestAnimationFrame(rafLoop)
 
-  es.addEventListener("open", () => console.log("Connected to /sse/chat"))
-  es.addEventListener("error", () => console.error("SSE error (reconnecting...)"))
-
+  const es = new EventSource('/sse/chat')
+  es.addEventListener('open', () => console.log('Connected to /sse/chat'))
+  es.addEventListener('error', (err) => console.error('SSE error', err))
   es.addEventListener('chat_message', (e) => {
-    const msg = JSON.parse(e.data)
-    queue.value.push({
-      ...msg,
-      id: crypto.randomUUID(),
-    })
-    playNext()
+    try {
+      const msg = JSON.parse(e.data) as ChatMessage
+      if (!msg.id) msg.id = crypto.randomUUID()
+      queue.value.push(msg)
+      // попробуем запустить спавн (не await)
+      trySpawnOnce()
+    } catch (err) {
+      console.error('Bad SSE message', err)
+    }
+  })
+
+  const onResize = () => {
+    // при ресайзе возможно появилось место
+    trySpawnOnce()
+  }
+  window.addEventListener('resize', onResize)
+
+  onUnmounted(() => {
+    es.close()
+    if (rafId) cancelAnimationFrame(rafId)
+    window.removeEventListener('resize', onResize)
   })
 })
 </script>
@@ -97,7 +191,7 @@ onMounted(() => {
 .ticker {
   position: relative;
   width: 100%;
-  height: 48px;
+  height: 24px;
   overflow: hidden;
   background: transparent;
 }
@@ -105,10 +199,11 @@ onMounted(() => {
 .message {
   position: absolute;
   top: 0;
+  left: 0;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -118,7 +213,7 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0,0,0,0.9);
   border-radius: 6px;
   z-index: 0;
 }
@@ -128,14 +223,8 @@ onMounted(() => {
   z-index: 1;
 }
 
-.user {
-  margin-left: 16px;
-}
-
-.text {
-  color: #ffffff;
-  margin-right: 16px;
-}
+.user { margin-left: 10px; }
+.text { color: #ffffff; margin-right: 10px; }
 
 .ticker, .message, .user, .text {
   font-family: 'Roboto Mono', monospace;
