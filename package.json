@@ -17,6 +17,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@twurple/api": "8.0.3",
+    "@twurple/auth": "8.0.3",
+    "@twurple/chat": "8.0.3",
+    "@twurple/eventsub-ws": "8.0.3",
     "axios": "1.13.3",
     "colors": "^1.4.0",
     "dotenv": "^16.4.5",
